@@ -55,3 +55,20 @@ static int io_sqe_buffer_register(struct io_ring_ctx *ctx, struct iovec *iov,
 		pages = NULL;
 		goto done;
 	}
+
+	if (nr_pages > 1) { // if more than one page
+		folio = page_folio(pages[0]); // converts from page to folio
+		// returns the folio that contains this page
+		for (i = 1; i < nr_pages; i++) {
+			if (page_folio(pages[i]) != folio) { // different folios -> not physically contiguous 
+				folio = NULL; // set folio to NULL as we cannot coalesce into a single entry
+				break;
+			}
+		}
+		if (folio) { // if all the pages are in the same folio
+			folio_put_refs(folio, nr_pages - 1); 
+			nr_pages = 1; // sets nr_pages to 1 as it can be represented as a single folio page
+		}
+	}
+}
+// Here if the iov spans more than a single physical page, the kernel will loop through pages to check if they belong to the same folio. 
