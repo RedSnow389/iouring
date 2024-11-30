@@ -40,3 +40,24 @@ struct sock_common {
 	/* sum bitfield members: 7 bits, bit holes: 1, sum bit holes: 1 bits */
 	/* last cacheline: 8 bytes */
 };
+
+struct proto {
+	void                       (*close)(struct sock *, long int); /*     0     8 */
+	int                        (*pre_connect)(struct sock *, struct sockaddr *, int); /*     8     8 */
+	int                        (*connect)(struct sock *, struct sockaddr *, int); /*    16     8 */
+	int                        (*disconnect)(struct sock *, int); /*    24     8 */
+	struct sock *              (*accept)(struct sock *, int, int *, bool); /*    32     8 */
+	int                        (*ioctl)(struct sock *, int, long unsigned int); /*    40     8 */
+	int                        (*init)(struct sock *); /*    48     8 */
+	void                       (*destroy)(struct sock *); /*    56     8 */
+	/* --- cacheline 1 boundary (64 bytes) --- */
+	void                       (*shutdown)(struct sock *, int); /*    64     8 */
+	int                        (*setsockopt)(struct sock *, int, int, sockptr_t, unsigned int); /*    72     8 */
+	int                        (*getsockopt)(struct sock *, int, int, char *, int *); /*    80     8 */
+
+	...
+
+	/* size: 432, cachelines: 7, members: 54 */
+	/* sum members: 425, holes: 2, sum holes: 7 */
+	/* last cacheline: 48 bytes */
+};
