@@ -70,5 +70,46 @@ static int io_sqe_buffer_register(struct io_ring_ctx *ctx, struct iovec *iov,
 			nr_pages = 1; // sets nr_pages to 1 as it can be represented as a single folio page
 		}
 	}
+		imu = kvmalloc(struct_size(imu, bvec, nr_pages), GFP_KERNEL); 
+	// allocates imu with an array for nr_pages bio_vec(s)
+	// bio_vec - a contiguous range of physical memory addresses
+	// we need a bio_vec for each (physical) page
+    // in the case of a folio - the array of bio_vec(s) will be of size 1
+	if (!imu)
+		goto done;
+
+	ret = io_buffer_account_pin(ctx, pages, nr_pages, imu, last_hpage);
+	if (ret) {
+		unpin_user_pages(pages, nr_pages);
+		goto done;
+	}
+
+	off = (unsigned long) iov->iov_base & ~PAGE_MASK;
+	size = iov->iov_len; // sets the size to that passed by the user!
+	/* store original address for later verification */
+	imu->ubuf = (unsigned long) iov->iov_base; // user-controlled
+	imu->ubuf_end = imu->ubuf + iov->iov_len; // calculates the end based on the length
+	imu->nr_bvecs = nr_pages; // this would be 1 in the case of folio
+	*pimu = imu;
+	ret = 0;
+
+	if (folio) { // in case of folio - we need just a single bio_vec (efficiant!)
+		bvec_set_page(&imu->bvec[0], pages[0], size, off);
+		goto done;
+	}
+	for (i = 0; i < nr_pages; i++) { 
+		size_t vec_len;
+
+		vec_len = min_t(size_t, size, PAGE_SIZE - off);
+		bvec_set_page(&imu->bvec[i], pages[i], vec_len, off);
+		off = 0;
+		size -= vec_len;
+	}
+done:
+	if (ret)
+		kvfree(imu);
+	kvfree(pages);
+	return ret;
+}
 }
 // Here if the iov spans more than a single physical page, the kernel will loop through pages to check if they belong to the same folio. 
